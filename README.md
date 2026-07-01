@@ -22,6 +22,7 @@ When a Mac is truly asleep, Python is paused and cannot hear claps or watch keyb
 - A browser logged into Claude
 - Microphone permission for the app running FRIDAY
 - Accessibility permission for the app running FRIDAY if you use mouse/keyboard detection
+- Input Monitoring permission for the app running FRIDAY if mouse/keyboard events do not arrive
 
 ## Install
 
@@ -84,6 +85,7 @@ For keyboard and mouse detection:
 1. Open **System Settings**.
 2. Go to **Privacy & Security**.
 3. Add the app running FRIDAY under **Accessibility**. This may be Terminal, iTerm, Python, or Codex depending on how you start it.
+4. If FRIDAY starts without warnings but does not react to movement or keys, add the same app under **Input Monitoring**.
 
 For clap detection:
 
