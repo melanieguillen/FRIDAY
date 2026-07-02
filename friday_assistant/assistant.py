@@ -16,6 +16,8 @@ from typing import Callable
 
 
 WELCOME_MESSAGE = "Welcome, doctor Soler"
+WELCOME_VOICE = "Eddy (Spanish (Spain))"
+WELCOME_SPEECH_RATE = 210
 CLAUDE_URL = "https://claude.ai/new"
 CLAUDE_COMMAND = "claude"
 SPOTIFY_APP_NAME = "Spotify"
@@ -30,6 +32,8 @@ class Settings:
     clap_threshold: float
     clap_window_seconds: float
     cooldown_seconds: float
+    voice: str
+    speech_rate: int
     dry_run: bool
     enable_input: bool
     enable_claps: bool
@@ -250,7 +254,7 @@ class FridayAssistant:
 
     def _run(self, command: list[str], *, description: str) -> int:
         if self.settings.dry_run:
-            print(f"[dry-run] {description}: {' '.join(command)}")
+            print(f"[dry-run] {description}: {shlex.join(command)}")
             return 0
 
         try:
@@ -268,15 +272,32 @@ class FridayAssistant:
 
         return result.returncode
 
+    def _start(self, command: list[str], *, description: str) -> int:
+        if self.settings.dry_run:
+            print(f"[dry-run] {description}: {shlex.join(command)}")
+            return 0
+
+        try:
+            subprocess.Popen(command, stdout=subprocess.DEVNULL, start_new_session=True)
+        except FileNotFoundError:
+            print(f"Skipped {description}: command not found: {command[0]}")
+            return 127
+        except OSError as exc:
+            print(f"Skipped {description}: {exc}")
+            return 1
+
+        return 0
+
     def _wake_display(self) -> None:
         if platform.system() == "Darwin":
-            self._run(["caffeinate", "-u", "-t", "2"], description="wake display")
+            self._start(["caffeinate", "-u", "-t", "2"], description="wake display")
         else:
             print("Wake display is only implemented for macOS.")
 
     def _speak(self, text: str) -> None:
         if platform.system() == "Darwin":
-            self._run(["say", text], description="speak welcome message")
+            command = ["say", "-v", self.settings.voice, "-r", str(self.settings.speech_rate), text]
+            self._start(command, description="speak welcome message")
         else:
             print(text)
 
@@ -505,6 +526,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Seconds to ignore repeated wake events after FRIDAY runs.",
     )
     parser.add_argument(
+        "--voice",
+        default=WELCOME_VOICE,
+        help="macOS voice to use for the welcome phrase.",
+    )
+    parser.add_argument(
+        "--speech-rate",
+        type=int,
+        default=WELCOME_SPEECH_RATE,
+        help="Words per minute for the welcome phrase.",
+    )
+    parser.add_argument(
         "--idle-arm-seconds",
         type=float,
         default=300.0,
@@ -554,6 +586,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Print available audio devices and exit.",
     )
     parser.add_argument(
+        "--list-voices",
+        action="store_true",
+        help="Print installed macOS voices and exit.",
+    )
+    parser.add_argument(
         "--spotify-app",
         default=SPOTIFY_APP_NAME,
         help="macOS Spotify app name to open when --spotify-target app is used.",
@@ -572,7 +609,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--spotify-web-play-delay",
         type=float,
-        default=5.0,
+        default=2.0,
         help="Seconds to wait before sending the Spotify Web play keystroke.",
     )
     parser.add_argument(
@@ -617,10 +654,20 @@ def list_audio_devices() -> int:
     return 0
 
 
+def list_voices() -> int:
+    if platform.system() != "Darwin":
+        print("macOS voices are only available on macOS.", file=sys.stderr)
+        return 1
+
+    return subprocess.run(["say", "-v", "?"], check=False).returncode
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     if args.list_audio_devices:
         return list_audio_devices()
+    if args.list_voices:
+        return list_voices()
 
     assistant = FridayAssistant(
         Settings(
@@ -628,6 +675,8 @@ def main(argv: list[str] | None = None) -> int:
             clap_threshold=args.clap_threshold,
             clap_window_seconds=args.clap_window,
             cooldown_seconds=args.cooldown,
+            voice=args.voice,
+            speech_rate=args.speech_rate,
             dry_run=args.dry_run,
             enable_input=args.input_events and not args.no_input,
             enable_claps=args.claps and not args.no_claps,
