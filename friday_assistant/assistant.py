@@ -14,6 +14,8 @@ from typing import Callable
 
 WELCOME_MESSAGE = "Welcome, doctor Soler"
 CLAUDE_URL = "https://claude.ai/new"
+CLAUDE_APP_NAME = "Claude"
+SPOTIFY_APP_NAME = "Spotify"
 SPOTIFY_LIKED_SONGS_URI = "spotify:collection:tracks"
 SPOTIFY_LIKED_SONGS_WEB_URL = "https://open.spotify.com/collection/tracks"
 
@@ -32,6 +34,9 @@ class Settings:
     idle_arm_seconds: float
     enable_resume_monitor: bool
     resume_gap_seconds: float
+    spotify_app: str
+    claude_app: str
+    allow_browser_fallback: bool
 
 
 def macos_session_is_locked() -> bool:
@@ -262,15 +267,21 @@ class FridayAssistant:
     def _open_spotify_liked_songs(self) -> None:
         if platform.system() == "Darwin":
             opened_spotify = self._run(
-                ["open", SPOTIFY_LIKED_SONGS_URI],
+                ["open", "-a", self.settings.spotify_app, SPOTIFY_LIKED_SONGS_URI],
                 description="open Spotify Liked Songs",
             )
             if opened_spotify != 0:
-                self._run(
-                    ["open", SPOTIFY_LIKED_SONGS_WEB_URL],
-                    description="open Spotify Liked Songs in browser",
+                opened_app = self._run(
+                    ["open", "-a", self.settings.spotify_app],
+                    description="open Spotify app",
                 )
-                return
+                if opened_app != 0:
+                    if self.settings.allow_browser_fallback:
+                        self._run(
+                            ["open", SPOTIFY_LIKED_SONGS_WEB_URL],
+                            description="open Spotify Liked Songs in browser",
+                        )
+                    return
 
             if not self.settings.dry_run:
                 time.sleep(1.5)
@@ -290,14 +301,25 @@ class FridayAssistant:
             )
             return
 
-        self._run(["xdg-open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs")
+        if self.settings.allow_browser_fallback:
+            self._run(["xdg-open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs")
+        else:
+            print("Spotify native app launch is only implemented for macOS.")
 
     def _open_claude(self) -> None:
         if platform.system() == "Darwin":
-            self._run(["open", CLAUDE_URL], description="open Claude")
+            opened_claude = self._run(
+                ["open", "-a", self.settings.claude_app],
+                description="open Claude app",
+            )
+            if opened_claude != 0 and self.settings.allow_browser_fallback:
+                self._run(["open", CLAUDE_URL], description="open Claude in browser")
             return
 
-        self._run(["xdg-open", CLAUDE_URL], description="open Claude")
+        if self.settings.allow_browser_fallback:
+            self._run(["xdg-open", CLAUDE_URL], description="open Claude")
+        else:
+            print("Claude native app launch is only implemented for macOS.")
 
 
 class InputListener:
@@ -449,6 +471,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Print available audio devices and exit.",
     )
+    parser.add_argument(
+        "--spotify-app",
+        default=SPOTIFY_APP_NAME,
+        help="macOS Spotify app name to open.",
+    )
+    parser.add_argument(
+        "--claude-app",
+        default=CLAUDE_APP_NAME,
+        help="macOS Claude app name to open.",
+    )
+    parser.add_argument(
+        "--browser-fallback",
+        action="store_true",
+        help="Open browser URLs if the native apps cannot be opened.",
+    )
     parser.add_argument("--run-once", action="store_true", help="Run the welcome sequence once and exit.")
     parser.add_argument("--dry-run", action="store_true", help="Print actions without opening apps or speaking.")
     return parser.parse_args(argv)
@@ -495,6 +532,9 @@ def main(argv: list[str] | None = None) -> int:
             idle_arm_seconds=args.idle_arm_seconds,
             enable_resume_monitor=not args.no_resume_monitor,
             resume_gap_seconds=args.resume_gap_seconds,
+            spotify_app=args.spotify_app,
+            claude_app=args.claude_app,
+            allow_browser_fallback=args.browser_fallback,
         )
     )
 

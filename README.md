@@ -4,9 +4,7 @@ FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac is
 
 > Welcome, doctor Soler
 
-After that it opens Spotify to your Liked Songs, starts playback, and opens Claude.
-
-If the native Spotify app is not installed, FRIDAY opens Spotify Web instead. Browser autoplay rules may require you to press play manually in that fallback path.
+After that it opens the native Spotify app to your Liked Songs, starts playback, and opens the native Claude app.
 
 ## What it can and cannot do
 
@@ -21,7 +19,7 @@ FRIDAY must be running before you lock the Mac or close the lid. If you quit the
 - macOS
 - Python 3.10+
 - Spotify installed and logged in for native playback
-- A browser logged into Claude
+- Claude desktop app installed and logged in
 - Microphone permission for the app running FRIDAY
 - Accessibility permission for the app running FRIDAY if you use mouse/keyboard detection
 - Input Monitoring permission for the app running FRIDAY if mouse/keyboard events do not arrive
@@ -96,6 +94,18 @@ List microphones and choose one for claps:
 ```bash
 python -m friday_assistant --list-audio-devices
 python -m friday_assistant --audio-device "MacBook Pro Microphone"
+```
+
+FRIDAY opens native apps by default. If your app names are different:
+
+```bash
+python -m friday_assistant --spotify-app "Spotify" --claude-app "Claude"
+```
+
+If you ever want the older browser fallback behavior:
+
+```bash
+python -m friday_assistant --browser-fallback
 ```
 
 ## macOS permissions
