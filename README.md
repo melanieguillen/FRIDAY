@@ -4,7 +4,7 @@ FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac mo
 
 > Welcome, doctor Soler
 
-After that it opens Spotify Web to your Liked Songs, starts playback, and starts Claude Code in a new Terminal window. The welcome voice starts immediately and uses a male Spanish voice by default.
+After that it opens Spotify Web to your Liked Songs, starts playback, and starts Claude Code in a new Terminal window. The welcome voice starts immediately using your normal macOS voice.
 
 ## What it can and cannot do
 
@@ -92,7 +92,7 @@ python -m friday_assistant --list-audio-devices
 python -m friday_assistant --audio-device "MacBook Pro Microphone"
 ```
 
-FRIDAY uses the macOS voice `Eddy (Spanish (Spain))` by default. To see your installed voices:
+FRIDAY uses your normal macOS voice by default. To see your installed voices:
 
 ```bash
 python -m friday_assistant --list-voices
@@ -101,7 +101,7 @@ python -m friday_assistant --list-voices
 To use another voice or speaking speed:
 
 ```bash
-python -m friday_assistant --voice "Reed (Spanish (Spain))" --speech-rate 220
+python -m friday_assistant --voice "Alex" --speech-rate 200
 ```
 
 FRIDAY opens Spotify Web by default because the Spotify desktop app is optional. It waits 2 seconds for your Liked Songs page to load, then sends the space-bar play command. Make sure your browser is already logged into Spotify.

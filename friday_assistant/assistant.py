@@ -16,8 +16,6 @@ from typing import Callable
 
 
 WELCOME_MESSAGE = "Welcome, doctor Soler"
-WELCOME_VOICE = "Eddy (Spanish (Spain))"
-WELCOME_SPEECH_RATE = 210
 CLAUDE_URL = "https://claude.ai/new"
 CLAUDE_COMMAND = "claude"
 SPOTIFY_APP_NAME = "Spotify"
@@ -32,8 +30,8 @@ class Settings:
     clap_threshold: float
     clap_window_seconds: float
     cooldown_seconds: float
-    voice: str
-    speech_rate: int
+    voice: str | None
+    speech_rate: int | None
     dry_run: bool
     enable_input: bool
     enable_claps: bool
@@ -296,7 +294,12 @@ class FridayAssistant:
 
     def _speak(self, text: str) -> None:
         if platform.system() == "Darwin":
-            command = ["say", "-v", self.settings.voice, "-r", str(self.settings.speech_rate), text]
+            command = ["say"]
+            if self.settings.voice:
+                command.extend(["-v", self.settings.voice])
+            if self.settings.speech_rate:
+                command.extend(["-r", str(self.settings.speech_rate)])
+            command.append(text)
             self._start(command, description="speak welcome message")
         else:
             print(text)
@@ -527,13 +530,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--voice",
-        default=WELCOME_VOICE,
         help="macOS voice to use for the welcome phrase.",
     )
     parser.add_argument(
         "--speech-rate",
         type=int,
-        default=WELCOME_SPEECH_RATE,
         help="Words per minute for the welcome phrase.",
     )
     parser.add_argument(
