@@ -30,6 +30,8 @@ class Settings:
     audio_device: int | str | None
     require_locked_or_idle: bool
     idle_arm_seconds: float
+    enable_resume_monitor: bool
+    resume_gap_seconds: float
 
 
 def macos_session_is_locked() -> bool:
@@ -134,6 +136,63 @@ class WakeGate:
             return f"idle for {idle_seconds:.0f} seconds"
 
         return None
+
+
+class ResumeMonitor:
+    def __init__(
+        self,
+        callback: Callable[[str], None],
+        *,
+        enabled: bool,
+        resume_gap_seconds: float,
+        poll_seconds: float = 2.0,
+    ) -> None:
+        self.callback = callback
+        self.enabled = enabled
+        self.resume_gap_seconds = resume_gap_seconds
+        self.poll_seconds = poll_seconds
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._last_wall_time = time.time()
+        self._last_locked = macos_session_is_locked()
+
+    def start(self) -> bool:
+        if not self.enabled:
+            return False
+
+        self._thread = threading.Thread(target=self._monitor, name="friday-resume-monitor", daemon=True)
+        self._thread.start()
+        print(
+            "FRIDAY will trigger after unlock or after waking from "
+            f"a pause longer than {self.resume_gap_seconds:.0f} seconds."
+        )
+        return True
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+
+    def check_once(self, *, now: float | None = None, locked: bool | None = None) -> str | None:
+        now = time.time() if now is None else now
+        locked = macos_session_is_locked() if locked is None else locked
+        elapsed = now - self._last_wall_time
+        reason = None
+
+        if elapsed >= self.resume_gap_seconds:
+            reason = f"wake/resume after {elapsed:.0f} seconds"
+        elif self._last_locked and not locked:
+            reason = "unlock"
+
+        self._last_wall_time = now
+        self._last_locked = locked
+        return reason
+
+    def _monitor(self) -> None:
+        while not self._stop.wait(self.poll_seconds):
+            reason = self.check_once()
+            if reason:
+                self.callback(reason)
 
 
 class FridayAssistant:
@@ -368,6 +427,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Trigger even while the computer is active. Useful for testing.",
     )
+    parser.add_argument(
+        "--no-resume-monitor",
+        action="store_true",
+        help="Disable automatic trigger after unlock or wake/resume.",
+    )
+    parser.add_argument(
+        "--resume-gap-seconds",
+        type=float,
+        default=60.0,
+        help="Trigger after the process resumes from a pause at least this long.",
+    )
     parser.add_argument("--no-input", action="store_true", help="Disable mouse and keyboard detection.")
     parser.add_argument("--no-claps", action="store_true", help="Disable two-clap detection.")
     parser.add_argument(
@@ -423,6 +493,8 @@ def main(argv: list[str] | None = None) -> int:
             audio_device=coerce_audio_device(args.audio_device),
             require_locked_or_idle=not args.always_trigger,
             idle_arm_seconds=args.idle_arm_seconds,
+            enable_resume_monitor=not args.no_resume_monitor,
+            resume_gap_seconds=args.resume_gap_seconds,
         )
     )
 
@@ -443,12 +515,26 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
 
-    if not listeners:
-        print("Nothing to listen for. Remove --no-input or --no-claps, or use --run-once.")
+    if not listeners and not assistant.settings.enable_resume_monitor:
+        print(
+            "Nothing to listen for. Remove --no-input, --no-claps, or --no-resume-monitor; "
+            "or use --run-once."
+        )
         return 2
 
+    resume_monitor = ResumeMonitor(
+        lambda source: assistant.trigger(source, force=True),
+        enabled=assistant.settings.enable_resume_monitor,
+        resume_gap_seconds=assistant.settings.resume_gap_seconds,
+    )
+
     try:
-        assistant.start_gate()
+        gate_started = False
+        if listeners:
+            assistant.start_gate()
+            gate_started = True
+
+        resume_started = resume_monitor.start()
 
         started_listeners: list[object] = []
         for listener in listeners:
@@ -458,7 +544,7 @@ def main(argv: list[str] | None = None) -> int:
             except RuntimeError as exc:
                 print(exc, file=sys.stderr)
 
-        if not started_listeners:
+        if not started_listeners and not resume_started:
             print("No listeners started.")
             return 1
 
@@ -472,6 +558,8 @@ def main(argv: list[str] | None = None) -> int:
             stop = getattr(listener, "stop", None)
             if stop:
                 stop()
-        assistant.stop_gate()
+        resume_monitor.stop()
+        if locals().get("gate_started"):
+            assistant.stop_gate()
 
     return 0

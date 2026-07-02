@@ -1,6 +1,6 @@
 # FRIDAY
 
-FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac is locked or idle, then listens for mouse movement, keyboard activation, or two claps. When triggered, it wakes the display, says:
+FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac is locked, idle, or resumed from sleep, then launches your work session. When triggered, it wakes the display, says:
 
 > Welcome, doctor Soler
 
@@ -12,7 +12,9 @@ If the native Spotify app is not installed, FRIDAY opens Spotify Web instead. Br
 
 FRIDAY can wake the display and react when this script is already running. It does not bypass a locked screen, type your password, or defeat macOS security.
 
-When a Mac is truly asleep, Python is paused and cannot hear claps or watch keyboard/mouse input. FRIDAY handles this safely by arming itself after the Mac is locked or has been idle for a while; once the machine wakes or receives an allowed event, it can run the welcome sequence.
+When a Mac is truly asleep, Python is paused and cannot hear claps or watch keyboard/mouse input. FRIDAY handles this safely by triggering after Python resumes from a long pause, or after it sees the Mac move from locked to unlocked.
+
+FRIDAY must be running before you lock the Mac or close the lid. If you quit the terminal or reboot, start FRIDAY again.
 
 ## Requirements
 
@@ -40,10 +42,22 @@ Start FRIDAY:
 python -m friday_assistant
 ```
 
-By default, FRIDAY only triggers after the Mac is locked or idle for 5 minutes. Change that idle window:
+By default, FRIDAY can trigger in three ways:
+
+- after the Mac unlocks
+- after the Mac wakes and FRIDAY notices it was paused for at least 60 seconds
+- after the Mac has been locked or idle for 5 minutes, then a mouse/keyboard/clap event arrives
+
+Change the idle window:
 
 ```bash
 python -m friday_assistant --idle-arm-seconds 60
+```
+
+Change the wake/resume pause threshold:
+
+```bash
+python -m friday_assistant --resume-gap-seconds 30
 ```
 
 Test without waiting for lock/idle:
@@ -51,6 +65,12 @@ Test without waiting for lock/idle:
 ```bash
 python -m friday_assistant --run-once --dry-run
 python -m friday_assistant --always-trigger
+```
+
+Run only the unlock/wake-resume monitor:
+
+```bash
+python -m friday_assistant --no-input --no-claps
 ```
 
 Run only the clap listener:
