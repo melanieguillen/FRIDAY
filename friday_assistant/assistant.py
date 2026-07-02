@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 import platform
 import re
+import shlex
+import shutil
 import subprocess
 import sys
 import threading
@@ -14,10 +17,11 @@ from typing import Callable
 
 WELCOME_MESSAGE = "Welcome, doctor Soler"
 CLAUDE_URL = "https://claude.ai/new"
-CLAUDE_APP_NAME = "Claude"
+CLAUDE_COMMAND = "claude"
 SPOTIFY_APP_NAME = "Spotify"
 SPOTIFY_LIKED_SONGS_URI = "spotify:collection:tracks"
 SPOTIFY_LIKED_SONGS_WEB_URL = "https://open.spotify.com/collection/tracks"
+TERMINAL_APP_NAME = "Terminal"
 
 
 @dataclass(frozen=True)
@@ -34,8 +38,10 @@ class Settings:
     idle_arm_seconds: float
     enable_resume_monitor: bool
     resume_gap_seconds: float
+    spotify_target: str
     spotify_app: str
-    claude_app: str
+    claude_command: str
+    claude_workdir: str
     allow_browser_fallback: bool
 
 
@@ -265,6 +271,14 @@ class FridayAssistant:
             print(text)
 
     def _open_spotify_liked_songs(self) -> None:
+        if self.settings.spotify_target == "browser":
+            if platform.system() == "Darwin":
+                self._run(["open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs in browser")
+                return
+
+            self._run(["xdg-open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs in browser")
+            return
+
         if platform.system() == "Darwin":
             opened_spotify = self._run(
                 ["open", "-a", self.settings.spotify_app, SPOTIFY_LIKED_SONGS_URI],
@@ -308,10 +322,7 @@ class FridayAssistant:
 
     def _open_claude(self) -> None:
         if platform.system() == "Darwin":
-            opened_claude = self._run(
-                ["open", "-a", self.settings.claude_app],
-                description="open Claude app",
-            )
+            opened_claude = self._open_claude_code_in_terminal()
             if opened_claude != 0 and self.settings.allow_browser_fallback:
                 self._run(["open", CLAUDE_URL], description="open Claude in browser")
             return
@@ -319,7 +330,38 @@ class FridayAssistant:
         if self.settings.allow_browser_fallback:
             self._run(["xdg-open", CLAUDE_URL], description="open Claude")
         else:
-            print("Claude native app launch is only implemented for macOS.")
+            print("Claude Code terminal launch is only implemented for macOS.")
+
+    def _open_claude_code_in_terminal(self) -> int:
+        claude_command = self._resolved_claude_command()
+        if claude_command is None:
+            print(f"Skipped open Claude Code in Terminal: command not found: {self.settings.claude_command}")
+            return 127
+
+        workdir = os.path.expanduser(self.settings.claude_workdir)
+        shell_script = f"cd {shlex.quote(workdir)} && {shlex.quote(claude_command)}"
+        apple_script = shell_script.replace("\\", "\\\\").replace('"', '\\"')
+
+        return self._run(
+            [
+                "osascript",
+                "-e",
+                f'tell application "{TERMINAL_APP_NAME}"',
+                "-e",
+                "activate",
+                "-e",
+                f'do script "{apple_script}"',
+                "-e",
+                "end tell",
+            ],
+            description="open Claude Code in Terminal",
+        )
+
+    def _resolved_claude_command(self) -> str | None:
+        if self.settings.dry_run:
+            return shutil.which(self.settings.claude_command) or self.settings.claude_command
+
+        return shutil.which(self.settings.claude_command)
 
 
 class InputListener:
@@ -474,12 +516,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--spotify-app",
         default=SPOTIFY_APP_NAME,
-        help="macOS Spotify app name to open.",
+        help="macOS Spotify app name to open when --spotify-target app is used.",
     )
     parser.add_argument(
-        "--claude-app",
-        default=CLAUDE_APP_NAME,
-        help="macOS Claude app name to open.",
+        "--spotify-target",
+        choices=("browser", "app"),
+        default="browser",
+        help="Open Spotify in the browser or native app.",
+    )
+    parser.add_argument(
+        "--claude-command",
+        default=CLAUDE_COMMAND,
+        help="Claude Code command to run in Terminal.",
+    )
+    parser.add_argument(
+        "--claude-workdir",
+        default="~",
+        help="Directory where Claude Code should start.",
     )
     parser.add_argument(
         "--browser-fallback",
@@ -532,8 +585,10 @@ def main(argv: list[str] | None = None) -> int:
             idle_arm_seconds=args.idle_arm_seconds,
             enable_resume_monitor=not args.no_resume_monitor,
             resume_gap_seconds=args.resume_gap_seconds,
+            spotify_target=args.spotify_target,
             spotify_app=args.spotify_app,
-            claude_app=args.claude_app,
+            claude_command=args.claude_command,
+            claude_workdir=args.claude_workdir,
             allow_browser_fallback=args.browser_fallback,
         )
     )

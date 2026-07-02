@@ -4,7 +4,7 @@ FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac is
 
 > Welcome, doctor Soler
 
-After that it opens the native Spotify app to your Liked Songs, starts playback, and opens the native Claude app.
+After that it opens Spotify Web to your Liked Songs and starts Claude Code in a new Terminal window.
 
 ## What it can and cannot do
 
@@ -18,8 +18,8 @@ FRIDAY must be running before you lock the Mac or close the lid. If you quit the
 
 - macOS
 - Python 3.10+
-- Spotify installed and logged in for native playback
-- Claude desktop app installed and logged in
+- A browser logged into Spotify
+- Claude Code installed and logged in
 - Microphone permission for the app running FRIDAY
 - Accessibility permission for the app running FRIDAY if you use mouse/keyboard detection
 - Input Monitoring permission for the app running FRIDAY if mouse/keyboard events do not arrive
@@ -96,16 +96,22 @@ python -m friday_assistant --list-audio-devices
 python -m friday_assistant --audio-device "MacBook Pro Microphone"
 ```
 
-FRIDAY opens native apps by default. If your app names are different:
+FRIDAY opens Spotify Web by default because the Spotify desktop app is optional. If you install Spotify.app later:
 
 ```bash
-python -m friday_assistant --spotify-app "Spotify" --claude-app "Claude"
+python -m friday_assistant --spotify-target app --spotify-app "Spotify"
 ```
 
-If you ever want the older browser fallback behavior:
+FRIDAY opens Claude Code in Terminal by default. To choose where Claude Code starts:
 
 ```bash
-python -m friday_assistant --browser-fallback
+python -m friday_assistant --claude-workdir "~/Documents"
+```
+
+If the `claude` command has a different name or path:
+
+```bash
+python -m friday_assistant --claude-command "/opt/homebrew/bin/claude"
 ```
 
 ## macOS permissions
