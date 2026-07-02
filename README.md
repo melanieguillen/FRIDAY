@@ -1,6 +1,6 @@
 # FRIDAY
 
-FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac is locked, idle, or resumed from sleep, then launches your work session. When triggered, it wakes the display, says:
+FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac moves from locked to unlocked, then launches your work session. When triggered, it wakes the display, says:
 
 > Welcome, doctor Soler
 
@@ -10,7 +10,7 @@ After that it opens Spotify Web to your Liked Songs and starts Claude Code in a 
 
 FRIDAY can wake the display and react when this script is already running. It does not bypass a locked screen, type your password, or defeat macOS security.
 
-When a Mac is truly asleep, Python is paused and cannot hear claps or watch keyboard/mouse input. FRIDAY handles this safely by triggering after Python resumes from a long pause, or after it sees the Mac move from locked to unlocked.
+When a Mac is truly asleep, Python is paused and cannot hear claps or watch keyboard/mouse input. FRIDAY handles this safely by waiting until it sees the Mac move from locked to unlocked.
 
 FRIDAY must be running before you lock the Mac or close the lid. If you quit the terminal or reboot, start FRIDAY again.
 
@@ -40,47 +40,43 @@ Start FRIDAY:
 python -m friday_assistant
 ```
 
-By default, FRIDAY can trigger in three ways:
+By default, FRIDAY triggers only after the Mac unlocks.
 
-- after the Mac unlocks
-- after the Mac wakes and FRIDAY notices it was paused for at least 60 seconds
-- after the Mac has been locked or idle for 5 minutes, then a mouse/keyboard/clap event arrives
-
-Change the idle window:
+To also trigger after a wake/resume pause:
 
 ```bash
-python -m friday_assistant --idle-arm-seconds 60
+python -m friday_assistant --resume-trigger unlock-or-resume
 ```
 
-Change the wake/resume pause threshold:
+Change the wake/resume pause threshold if resume triggers are enabled:
 
 ```bash
 python -m friday_assistant --resume-gap-seconds 30
 ```
 
-Test without waiting for lock/idle:
+Manual test commands fire immediately. Use these only to verify the welcome sequence:
 
 ```bash
 python -m friday_assistant --run-once --dry-run
-python -m friday_assistant --always-trigger
+python -m friday_assistant --run-once
 ```
 
-Run only the unlock/wake-resume monitor:
+Run only the unlock monitor:
 
 ```bash
 python -m friday_assistant --no-input --no-claps
 ```
 
-Run only the clap listener:
+Enable the clap listener as an extra trigger after lock/idle:
 
 ```bash
-python -m friday_assistant --no-input
+python -m friday_assistant --claps
 ```
 
-Run only mouse and keyboard detection:
+Enable mouse and keyboard as extra triggers after lock/idle:
 
 ```bash
-python -m friday_assistant --no-claps
+python -m friday_assistant --input-events
 ```
 
 If your room is noisy, raise the clap threshold:

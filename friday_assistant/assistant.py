@@ -38,6 +38,7 @@ class Settings:
     idle_arm_seconds: float
     enable_resume_monitor: bool
     resume_gap_seconds: float
+    resume_trigger: str
     spotify_target: str
     spotify_app: str
     claude_command: str
@@ -156,11 +157,13 @@ class ResumeMonitor:
         *,
         enabled: bool,
         resume_gap_seconds: float,
+        trigger_mode: str,
         poll_seconds: float = 2.0,
     ) -> None:
         self.callback = callback
         self.enabled = enabled
         self.resume_gap_seconds = resume_gap_seconds
+        self.trigger_mode = trigger_mode
         self.poll_seconds = poll_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -173,10 +176,15 @@ class ResumeMonitor:
 
         self._thread = threading.Thread(target=self._monitor, name="friday-resume-monitor", daemon=True)
         self._thread.start()
-        print(
-            "FRIDAY will trigger after unlock or after waking from "
-            f"a pause longer than {self.resume_gap_seconds:.0f} seconds."
-        )
+        if self.trigger_mode == "unlock":
+            print("FRIDAY will trigger after the Mac is unlocked.")
+        elif self.trigger_mode == "resume":
+            print(f"FRIDAY will trigger after waking from a pause longer than {self.resume_gap_seconds:.0f} seconds.")
+        else:
+            print(
+                "FRIDAY will trigger after unlock or after waking from "
+                f"a pause longer than {self.resume_gap_seconds:.0f} seconds."
+            )
         return True
 
     def stop(self) -> None:
@@ -190,9 +198,9 @@ class ResumeMonitor:
         elapsed = now - self._last_wall_time
         reason = None
 
-        if elapsed >= self.resume_gap_seconds:
+        if self.trigger_mode in ("resume", "unlock-or-resume") and elapsed >= self.resume_gap_seconds:
             reason = f"wake/resume after {elapsed:.0f} seconds"
-        elif self._last_locked and not locked:
+        elif self.trigger_mode in ("unlock", "unlock-or-resume") and self._last_locked and not locked:
             reason = "unlock"
 
         self._last_wall_time = now
@@ -500,7 +508,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--resume-gap-seconds",
         type=float,
         default=60.0,
-        help="Trigger after the process resumes from a pause at least this long.",
+        help="Trigger after the process resumes from a pause at least this long when resume triggers are enabled.",
+    )
+    parser.add_argument(
+        "--resume-trigger",
+        choices=("unlock", "resume", "unlock-or-resume"),
+        default="unlock",
+        help="Choose whether the automatic monitor triggers on unlock, resume, or either.",
+    )
+    parser.add_argument(
+        "--input-events",
+        action="store_true",
+        help="Enable mouse and keyboard triggers after the Mac is locked or idle.",
+    )
+    parser.add_argument(
+        "--claps",
+        action="store_true",
+        help="Enable the two-clap trigger after the Mac is locked or idle.",
     )
     parser.add_argument("--no-input", action="store_true", help="Disable mouse and keyboard detection.")
     parser.add_argument("--no-claps", action="store_true", help="Disable two-clap detection.")
@@ -578,13 +602,14 @@ def main(argv: list[str] | None = None) -> int:
             clap_window_seconds=args.clap_window,
             cooldown_seconds=args.cooldown,
             dry_run=args.dry_run,
-            enable_input=not args.no_input,
-            enable_claps=not args.no_claps,
+            enable_input=args.input_events and not args.no_input,
+            enable_claps=args.claps and not args.no_claps,
             audio_device=coerce_audio_device(args.audio_device),
             require_locked_or_idle=not args.always_trigger,
             idle_arm_seconds=args.idle_arm_seconds,
             enable_resume_monitor=not args.no_resume_monitor,
             resume_gap_seconds=args.resume_gap_seconds,
+            resume_trigger=args.resume_trigger,
             spotify_target=args.spotify_target,
             spotify_app=args.spotify_app,
             claude_command=args.claude_command,
@@ -621,6 +646,7 @@ def main(argv: list[str] | None = None) -> int:
         lambda source: assistant.trigger(source, force=True),
         enabled=assistant.settings.enable_resume_monitor,
         resume_gap_seconds=assistant.settings.resume_gap_seconds,
+        trigger_mode=assistant.settings.resume_trigger,
     )
 
     try:
