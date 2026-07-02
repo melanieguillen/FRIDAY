@@ -4,7 +4,7 @@ FRIDAY is a small macOS-first personal wake assistant. It waits until the Mac mo
 
 > Welcome, doctor Soler
 
-After that it opens Spotify Web to your Liked Songs and starts Claude Code in a new Terminal window.
+After that it opens Spotify Web to your Liked Songs, starts playback, and starts Claude Code in a new Terminal window.
 
 ## What it can and cannot do
 
@@ -21,7 +21,7 @@ FRIDAY must be running before you lock the Mac or close the lid. If you quit the
 - A browser logged into Spotify
 - Claude Code installed and logged in
 - Microphone permission for the app running FRIDAY
-- Accessibility permission for the app running FRIDAY if you use mouse/keyboard detection
+- Accessibility permission for the app running FRIDAY to start Spotify Web playback or use mouse/keyboard detection
 - Input Monitoring permission for the app running FRIDAY if mouse/keyboard events do not arrive
 
 ## Install
@@ -92,7 +92,21 @@ python -m friday_assistant --list-audio-devices
 python -m friday_assistant --audio-device "MacBook Pro Microphone"
 ```
 
-FRIDAY opens Spotify Web by default because the Spotify desktop app is optional. If you install Spotify.app later:
+FRIDAY opens Spotify Web by default because the Spotify desktop app is optional. It waits 5 seconds for your Liked Songs page to load, then sends the space-bar play command. Make sure your browser is already logged into Spotify.
+
+If Spotify needs more time to load:
+
+```bash
+python -m friday_assistant --spotify-web-play-delay 8
+```
+
+To open Spotify Web without pressing play:
+
+```bash
+python -m friday_assistant --no-spotify-web-play
+```
+
+If you install Spotify.app later:
 
 ```bash
 python -m friday_assistant --spotify-target app --spotify-app "Spotify"

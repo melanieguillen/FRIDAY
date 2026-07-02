@@ -41,6 +41,8 @@ class Settings:
     resume_trigger: str
     spotify_target: str
     spotify_app: str
+    spotify_web_play: bool
+    spotify_web_play_delay: float
     claude_command: str
     claude_workdir: str
     allow_browser_fallback: bool
@@ -281,7 +283,12 @@ class FridayAssistant:
     def _open_spotify_liked_songs(self) -> None:
         if self.settings.spotify_target == "browser":
             if platform.system() == "Darwin":
-                self._run(["open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs in browser")
+                opened_spotify = self._run(
+                    ["open", SPOTIFY_LIKED_SONGS_WEB_URL],
+                    description="open Spotify Liked Songs in browser",
+                )
+                if opened_spotify == 0 and self.settings.spotify_web_play:
+                    self._start_spotify_web_playback()
                 return
 
             self._run(["xdg-open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs in browser")
@@ -327,6 +334,15 @@ class FridayAssistant:
             self._run(["xdg-open", SPOTIFY_LIKED_SONGS_WEB_URL], description="open Spotify Liked Songs")
         else:
             print("Spotify native app launch is only implemented for macOS.")
+
+    def _start_spotify_web_playback(self) -> None:
+        if not self.settings.dry_run:
+            time.sleep(self.settings.spotify_web_play_delay)
+
+        self._run(
+            ["osascript", "-e", 'tell application "System Events" to key code 49'],
+            description="start Spotify Web playback",
+        )
 
     def _open_claude(self) -> None:
         if platform.system() == "Darwin":
@@ -549,6 +565,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Open Spotify in the browser or native app.",
     )
     parser.add_argument(
+        "--no-spotify-web-play",
+        action="store_true",
+        help="Do not send a play keystroke after opening Spotify Web.",
+    )
+    parser.add_argument(
+        "--spotify-web-play-delay",
+        type=float,
+        default=5.0,
+        help="Seconds to wait before sending the Spotify Web play keystroke.",
+    )
+    parser.add_argument(
         "--claude-command",
         default=CLAUDE_COMMAND,
         help="Claude Code command to run in Terminal.",
@@ -612,6 +639,8 @@ def main(argv: list[str] | None = None) -> int:
             resume_trigger=args.resume_trigger,
             spotify_target=args.spotify_target,
             spotify_app=args.spotify_app,
+            spotify_web_play=not args.no_spotify_web_play,
+            spotify_web_play_delay=args.spotify_web_play_delay,
             claude_command=args.claude_command,
             claude_workdir=args.claude_workdir,
             allow_browser_fallback=args.browser_fallback,
